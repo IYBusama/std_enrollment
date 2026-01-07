@@ -1,21 +1,30 @@
 <?php
-include 'db.php';
+require_once 'classes/Teacher.php';
+require_once 'classes/Course.php';
+require_once 'classes/TeacherCourse.php';
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $teacher_id = $_POST['teacher_id'];
-    $course_id = $_POST['course_id'];
-    $sql = "INSERT INTO teacher_courses (teacher_id, course_id) VALUES ($teacher_id, $course_id)";
-    $conn->query($sql);
+$teacherObj = new Teacher();
+$courseObj  = new Course();
+$tcObj      = new TeacherCourse();
+
+$message = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $teacher_id = (int)$_POST['teacher_id'];
+    $course_id  = (int)$_POST['course_id'];
+
+    if ($tcObj->assign($teacher_id, $course_id)) {
+        $message = '<div class="alert alert-success">Teacher successfully assigned to course!</div>';
+    } else {
+        $message = '<div class="alert alert-warning">Assignment failed or already exists.</div>';
+    }
 }
 
-$teachers = $conn->query("SELECT * FROM teachers");
-$courses = $conn->query("SELECT * FROM courses");
-
-$assignments = $conn->query("SELECT tc.teacher_id, tc.course_id, t.first_name AS t_first, t.last_name AS t_last, c.title AS c_title 
-                             FROM teacher_courses tc 
-                             JOIN teachers t ON tc.teacher_id = t.teacher_id 
-                             JOIN courses c ON tc.course_id = c.id");
+$teachers    = $teacherObj->getAll();
+$courses     = $courseObj->getAll();
+$assignments = $tcObj->getAllAssignments();
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -25,45 +34,68 @@ $assignments = $conn->query("SELECT tc.teacher_id, tc.course_id, t.first_name AS
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container mt-5">
-        <h2>Assign Teacher to Course</h2>
-        <form method="POST">
-            <div class="mb-3">
-                <label>Teacher</label>
-                <select name="teacher_id" class="form-select" required>
-                    <?php while ($row = $teachers->fetch_assoc()) { ?>
-                        <option value="<?php echo $row['teacher_id']; ?>"><?php echo $row['first_name'] . ' ' . $row['last_name']; ?></option>
-                    <?php } ?>
-                </select>
-            </div>
-            <div class="mb-3">
-                <label>Course</label>
-                <select name="course_id" class="form-select" required>
-                    <?php while ($row = $courses->fetch_assoc()) { ?>
-                        <option value="<?php echo $row['id']; ?>"><?php echo $row['title']; ?></option>
-                    <?php } ?>
-                </select>
-            </div>
-            <button type="submit" class="btn btn-primary">Assign</button>
-        </form>
-        <table class="table mt-3">
-            <thead>
+<div class="container mt-5">
+    <h2>Assign Teacher to Course</h2>
+
+    <?= $message ?>
+
+    <form method="POST" class="row g-3 mb-5">
+        <div class="col-md-5">
+            <label class="form-label">Select Teacher</label>
+            <select name="teacher_id" class="form-select" required>
+                <option value="">-- Choose Teacher --</option>
+                <?php foreach ($teachers as $t): ?>
+                    <option value="<?= $t['teacher_id'] ?>">
+                        <?= htmlspecialchars($t['first_name'] . ' ' . $t['last_name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-md-5">
+            <label class="form-label">Select Course</label>
+            <select name="course_id" class="form-select" required>
+                <option value="">-- Choose Course --</option>
+                <?php foreach ($courses as $c): ?>
+                    <option value="<?= $c['id'] ?>">
+                        <?= htmlspecialchars($c['course_code'] . ' - ' . $c['title']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary w-100">Assign</button>
+        </div>
+    </form>
+
+    <h4>Current Teacher-Course Assignments</h4>
+    <table class="table table-hover table-bordered">
+        <thead class="table-light">
+            <tr>
+                <th>Teacher</th>
+                <th>Course</th>
+                <th>Course Code</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($assignments)): ?>
                 <tr>
-                    <th>Teacher</th>
-                    <th>Course</th>
+                    <td colspan="3" class="text-center text-muted">No assignments yet.</td>
                 </tr>
-            </thead>
-            <tbody>
-                <?php while ($row = $assignments->fetch_assoc()) { ?>
+            <?php else: ?>
+                <?php foreach ($assignments as $row): ?>
                     <tr>
-                        <td><?php echo $row['t_first'] . ' ' . $row['t_last']; ?></td>
-                        <td><?php echo $row['c_title']; ?></td>
+                        <td><?= htmlspecialchars($row['t_first'] . ' ' . $row['t_last']) ?></td>
+                        <td><?= htmlspecialchars($row['c_title']) ?></td>
+                        <td><?= htmlspecialchars($courseObj->getById($row['course_id'])['course_code'] ?? '') ?></td>
                     </tr>
-                <?php } ?>
-            </tbody>
-        </table>
-        <a href="index.html" class="btn btn-secondary">Back</a>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </tbody>
+    </table>
+
+    <a href="index.html" class="btn btn-secondary mt-3">← Back to Menu</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

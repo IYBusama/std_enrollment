@@ -1,37 +1,36 @@
 <?php
-include 'db.php';
 
-$action = isset($_GET['action']) ? $_GET['action'] : '';
-$id = isset($_GET['id']) ? $_GET['id'] : '';
+require_once 'classes/Student.php';
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+$student = new Student();
+
+$action = $_GET['action'] ?? '';
+$id = $_GET['id'] ?? '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $first_name = $_POST['first_name'];
-    $last_name = $_POST['last_name'];
-    $email = $_POST['email'];
+    $last_name  = $_POST['last_name'];
+    $email      = $_POST['email'];
 
     if (isset($_POST['add'])) {
-        $sql = "INSERT INTO students (first_name, last_name, email) VALUES ('$first_name', '$last_name', '$email')";
-        $conn->query($sql);
+        $student->create($first_name, $last_name, $email);
     } elseif (isset($_POST['update'])) {
-        $sql = "UPDATE students SET first_name='$first_name', last_name='$last_name', email='$email' WHERE id=$id";
-        $conn->query($sql);
+        $student->update($id, $first_name, $last_name, $email);
     }
-}
-
-if ($action == 'delete') {
-    $sql = "DELETE FROM students WHERE id=$id";
-    $conn->query($sql);
     header('Location: students.php');
+    exit;
 }
 
-$edit_data = null;
-if ($action == 'edit') {
-    $result = $conn->query("SELECT * FROM students WHERE id=$id");
-    $edit_data = $result->fetch_assoc();
+if ($action === 'delete' && $id) {
+    $student->delete($id);
+    header('Location: students.php');
+    exit;
 }
 
-$result = $conn->query("SELECT * FROM students");
+$edit_data = ($action === 'edit' && $id) ? $student->getById($id) : null;
+$students  = $student->getAll();
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -41,54 +40,76 @@ $result = $conn->query("SELECT * FROM students");
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container mt-5">
-        <h2>Students</h2>
-        <form method="POST">
-            <div class="mb-3">
-                <label>First Name</label>
-                <input type="text" name="first_name" class="form-control" value="<?php echo $edit_data['first_name'] ?? ''; ?>" required>
+<div class="container mt-5">
+    <h2>Manage Students</h2>
+
+    <form method="POST" class="mb-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">First Name</label>
+                <input type="text" name="first_name" class="form-control" 
+                       value="<?= htmlspecialchars($edit_data['first_name'] ?? '') ?>" required>
             </div>
-            <div class="mb-3">
-                <label>Last Name</label>
-                <input type="text" name="last_name" class="form-control" value="<?php echo $edit_data['last_name'] ?? ''; ?>" required>
+            <div class="col-md-4">
+                <label class="form-label">Last Name</label>
+                <input type="text" name="last_name" class="form-control" 
+                       value="<?= htmlspecialchars($edit_data['last_name'] ?? '') ?>" required>
             </div>
-            <div class="mb-3">
-                <label>Email</label>
-                <input type="email" name="email" class="form-control" value="<?php echo $edit_data['email'] ?? ''; ?>" required>
+            <div class="col-md-4">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-control" 
+                       value="<?= htmlspecialchars($edit_data['email'] ?? '') ?>" required>
             </div>
-            <?php if ($action == 'edit') { ?>
-                <button type="submit" name="update" class="btn btn-primary">Update</button>
-            <?php } else { ?>
-                <button type="submit" name="add" class="btn btn-primary">Add</button>
-            <?php } ?>
-        </form>
-        <table class="table mt-3">
-            <thead>
+        </div>
+        <div class="mt-3">
+            <?php if ($action === 'edit'): ?>
+                <button type="submit" name="update" class="btn btn-success">Update Student</button>
+                <a href="students.php" class="btn btn-secondary">Cancel</a>
+            <?php else: ?>
+                <button type="submit" name="add" class="btn btn-primary">Add Student</button>
+            <?php endif; ?>
+        </div>
+    </form>
+
+    <h4 class="mt-5">All Students</h4>
+    <table class="table table-hover table-bordered">
+        <thead class="table-light">
+            <tr>
+                <th>ID</th>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Email</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($students)): ?>
                 <tr>
-                    <th>ID</th>
-                    <th>First Name</th>
-                    <th>Last Name</th>
-                    <th>Email</th>
-                    <th>Actions</th>
+                    <td colspan="5" class="text-center text-muted">No students found.</td>
                 </tr>
-            </thead>
-            <tbody>
-                <?php while ($row = $result->fetch_assoc()) { ?>
-                    <tr>
-                        <td><?php echo $row['id']; ?></td>
-                        <td><?php echo $row['first_name']; ?></td>
-                        <td><?php echo $row['last_name']; ?></td>
-                        <td><?php echo $row['email']; ?></td>
-                        <td>
-                            <a href="students.php?action=edit&id=<?php echo $row['id']; ?>" class="btn btn-warning btn-sm">Edit</a>
-                            <a href="students.php?action=delete&id=<?php echo $row['id']; ?>" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?');">Delete</a>
-                        </td>
-                    </tr>
-                <?php } ?>
-            </tbody>
-        </table>
-        <a href="index.html" class="btn btn-secondary">Back</a>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+            <?php else: ?>
+                <?php foreach ($students as $row): ?>
+                <tr>
+                    <td><?= htmlspecialchars($row['id']) ?></td>
+                    <td><?= htmlspecialchars($row['first_name']) ?></td>
+                    <td><?= htmlspecialchars($row['last_name']) ?></td>
+                    <td><?= htmlspecialchars($row['email']) ?></td>
+                    <td>
+                        <a href="students.php?action=edit&id=<?= $row['id'] ?>" 
+                           class="btn btn-warning btn-sm">Edit</a>
+                        <a href="students.php?action=delete&id=<?= $row['id'] ?>" 
+                           class="btn btn-danger btn-sm" 
+                           onclick="return confirm('Are you sure you want to delete this student?');">Delete</a>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </tbody>
+    </table>
+
+    <a href="index.html" class="btn btn-secondary mt-3">← Back to Menu</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
